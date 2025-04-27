@@ -1,577 +1,343 @@
-// CMSC 341 - Spring 2025 - Project 4
+// dnadb.cpp
 #include "dnadb.h"
-#include <cmath>
 #include <iostream>
+#include <string>
+#include <algorithm> // for std::min
+using namespace std;
 
+// Constructor
 DnaDb::DnaDb(int size, hash_fn hash, prob_t probing)
 {
     m_hash = hash;
-    m_newPolicy = probing;
     m_currProbing = probing;
-    m_oldProbing = probing;
-
-    m_currentCap = findNextPrime(size);
-    m_currentTable = new DNA *[m_currentCap]();
-    m_currentSize = 0;
-    m_currNumDeleted = 0;
-
+    m_newPolicy = probing;
     m_oldTable = nullptr;
     m_oldCap = 0;
     m_oldSize = 0;
     m_oldNumDeleted = 0;
     m_transferIndex = 0;
+
+    // enforce prime bounds
+    if (size < MINPRIME)
+        size = MINPRIME;
+    if (size > MAXPRIME)
+        size = MAXPRIME;
+    if (!isPrime(size))
+        size = findNextPrime(size);
+
+    m_currentCap = size;
+    m_currentSize = 0;
+    m_currNumDeleted = 0;
+    m_currentTable = new DNA *[m_currentCap];
+    for (int i = 0; i < m_currentCap; i++)
+        m_currentTable[i] = nullptr;
 }
 
+// Destructor
 DnaDb::~DnaDb()
 {
-    for (int i = 0; i < m_currentCap; i++)
+    if (m_currentTable)
     {
-        if (m_currentTable[i] != nullptr)
-        {
+        for (int i = 0; i < m_currentCap; i++)
             delete m_currentTable[i];
-        }
+        delete[] m_currentTable;
     }
-    delete[] m_currentTable;
-
-    if (m_oldTable != nullptr)
+    if (m_oldTable)
     {
         for (int i = 0; i < m_oldCap; i++)
-        {
-            if (m_oldTable[i] != nullptr)
-            {
-                delete m_oldTable[i];
-            }
-        }
+            delete m_oldTable[i];
         delete[] m_oldTable;
     }
 }
 
+// Load factor — during rehash show old-table’s load, otherwise current
+float DnaDb::lambda() const
+{
+    if (m_oldTable)
+        return static_cast<float>(m_oldSize) / m_oldCap;
+    return static_cast<float>(m_currentSize) / m_currentCap;
+}
+
+// Deleted-ratio — same: old table if rehashing, else current
+float DnaDb::deletedRatio() const
+{
+    if (m_oldTable)
+    {
+        if (m_oldSize == 0)
+            return 0.0f;
+        return static_cast<float>(m_oldNumDeleted) / m_oldSize;
+    }
+    if (m_currentSize == 0)
+        return 0.0f;
+    return static_cast<float>(m_currNumDeleted) / m_currentSize;
+}
+
+// Check primality
+bool DnaDb::isPrime(int number)
+{
+    if (number <= 1)
+        return false;
+    if (number == 2)
+        return true;
+    if (number % 2 == 0)
+        return false;
+    for (int i = 3; i * i <= number; i += 2)
+        if (number % i == 0)
+            return false;
+    return true;
+}
+
+// Find smallest prime > current, bounded by MINPRIME/MAXPRIME
+int DnaDb::findNextPrime(int current)
+{
+    if (current <= MINPRIME)
+        return MINPRIME;
+    if (current >= MAXPRIME)
+        return MAXPRIME;
+    int next = current;
+    while (!isPrime(next))
+        ++next;
+    return next;
+}
+
+// Public insert
+bool DnaDb::insert(DNA dna)
+{
+    // invalid loc ID?
+    if (dna.getLocId() < MINLOCID || dna.getLocId() > MAXLOCID)
+        return false;
+    // no duplicates
+    if (getDNA(dna.getSequence(), dna.getLocId()).getSequence() != "")
+        return false;
+
+    // if mid-rehash, move next quarter first
+    if (m_oldTable)
+        transferNextQuarter();
+
+    unsigned idx = m_hash(dna.getSequence()) % m_currentCap;
+    unsigned i = 0, pos = idx;
+    while (true)
+    {
+        if (!m_currentTable[pos] || !m_currentTable[pos]->m_used)
+        {
+            delete m_currentTable[pos];
+            m_currentTable[pos] = new DNA(dna);
+            m_currentTable[pos]->m_used = true;
+            ++m_currentSize;
+            break;
+        }
+        ++i;
+        if (m_currProbing == LINEAR)
+            pos = (idx + i) % m_currentCap;
+        else if (m_currProbing == QUADRATIC)
+            pos = (idx + i * i) % m_currentCap;
+        else // DOUBLEHASH
+            pos = (idx + i * (11 - (m_hash(dna.getSequence()) % 11))) % m_currentCap;
+    }
+
+    checkRehashCriteria();
+    return true;
+}
+
+// Public remove
+bool DnaDb::remove(DNA dna)
+{
+    if (m_oldTable)
+        transferNextQuarter();
+
+    // search current table
+    {
+        unsigned idx = m_hash(dna.getSequence()) % m_currentCap;
+        unsigned i = 0, pos = idx;
+        while (m_currentTable[pos])
+        {
+            if (m_currentTable[pos]->m_used && *m_currentTable[pos] == dna)
+            {
+                m_currentTable[pos]->m_used = false;
+                ++m_currNumDeleted;
+                checkRehashCriteria();
+                return true;
+            }
+            ++i;
+            if (m_currProbing == LINEAR)
+                pos = (idx + i) % m_currentCap;
+            else if (m_currProbing == QUADRATIC)
+                pos = (idx + i * i) % m_currentCap;
+            else
+                pos = (idx + i * (11 - (m_hash(dna.getSequence()) % 11))) % m_currentCap;
+        }
+    }
+    // search old table
+    if (m_oldTable)
+    {
+        unsigned idx = m_hash(dna.getSequence()) % m_oldCap;
+        unsigned i = 0, pos = idx;
+        while (m_oldTable[pos])
+        {
+            if (m_oldTable[pos]->m_used && *m_oldTable[pos] == dna)
+            {
+                m_oldTable[pos]->m_used = false;
+                ++m_oldNumDeleted;
+                checkRehashCriteria();
+                return true;
+            }
+            ++i;
+            if (m_oldProbing == LINEAR)
+                pos = (idx + i) % m_oldCap;
+            else if (m_oldProbing == QUADRATIC)
+                pos = (idx + i * i) % m_oldCap;
+            else
+                pos = (idx + i * (11 - (m_hash(dna.getSequence()) % 11))) % m_oldCap;
+        }
+    }
+    return false;
+}
+
+// Public lookup
+const DNA DnaDb::getDNA(string sequence, int location) const
+{
+    DNA found = getDNAFromTable(sequence, location,
+                                m_currentTable, m_currentCap, m_currProbing);
+    if (found.getSequence().empty() && m_oldTable)
+        found = getDNAFromTable(sequence, location,
+                                m_oldTable, m_oldCap, m_oldProbing);
+    return found;
+}
+
+// table-scan helper
+DNA DnaDb::getDNAFromTable(string sequence, int location,
+                           DNA **table, int cap, prob_t probing) const
+{
+    unsigned idx = m_hash(sequence) % cap;
+    unsigned i = 0, pos = idx;
+    while (table[pos])
+    {
+        if (table[pos]->m_used &&
+            table[pos]->m_sequence == sequence &&
+            table[pos]->m_location == location)
+            return *table[pos];
+        ++i;
+        if (probing == LINEAR)
+            pos = (idx + i) % cap;
+        else if (probing == QUADRATIC)
+            pos = (idx + i * i) % cap;
+        else
+            pos = (idx + i * (11 - (m_hash(sequence) % 11))) % cap;
+    }
+    return DNA();
+}
+
+// updateLocId
+bool DnaDb::updateLocId(DNA dna, int location)
+{
+    DNA oldDNA = getDNA(dna.getSequence(), dna.getLocId());
+    if (oldDNA.getSequence().empty())
+        return false;
+    remove(dna);
+    DNA updated = dna;
+    updated.setLocID(location);
+    insert(updated);
+    return true;
+}
+
+// change policy
 void DnaDb::changeProbPolicy(prob_t policy)
 {
     m_newPolicy = policy;
 }
 
-bool DnaDb::insert(DNA dna)
-{
-    if (dna.getLocId() < MINLOCID || dna.getLocId() > MAXLOCID)
-    {
-        return false;
-    }
-
-    DNA existing = getDNA(dna.getSequence(), dna.getLocId());
-    if (!existing.getSequence().empty())
-    {
-        return false;
-    }
-
-    if (m_oldTable != nullptr)
-    {
-        DNA oldExisting = getDNAFromTable(dna.getSequence(), dna.getLocId(), m_oldTable, m_oldCap, m_oldProbing);
-        if (!oldExisting.getSequence().empty())
-        {
-            return false;
-        }
-    }
-
-    unsigned int index = m_hash(dna.getSequence()) % m_currentCap;
-    int i = 0;
-    unsigned int originalIndex = index;
-    int maxProbes = m_currentCap * 4;
-
-    while (m_currentTable[index] != nullptr && m_currentTable[index]->getUsed() && i < maxProbes)
-    {
-        i++;
-        if (m_currProbing == DOUBLEHASH)
-        {
-            int step = 11 - (m_hash(dna.getSequence()) % 11);
-            if (step == 0)
-                step = 1;
-            index = (originalIndex + i * step) % m_currentCap;
-        }
-        else if (m_currProbing == QUADRATIC)
-        {
-            index = (originalIndex + i * i) % m_currentCap;
-        }
-        else
-        {
-            index = (originalIndex + i) % m_currentCap;
-        }
-    }
-
-    if (i >= maxProbes)
-    {
-        // Fallback to linear probing
-        index = originalIndex;
-        i = 0;
-        while (m_currentTable[index] != nullptr && m_currentTable[index]->getUsed() && i < m_currentCap)
-        {
-            i++;
-            index = (originalIndex + i) % m_currentCap;
-        }
-        if (i >= m_currentCap)
-        {
-            return false;
-        }
-    }
-
-    if (m_currentTable[index] == nullptr)
-    {
-        m_currentTable[index] = new DNA(dna);
-        m_currentSize++;
-    }
-    else
-    {
-        *m_currentTable[index] = dna;
-        if (!m_currentTable[index]->getUsed())
-        {
-            m_currNumDeleted--;
-        }
-        m_currentSize++;
-    }
-    m_currentTable[index]->setUsed(true);
-
-    checkRehashCriteria();
-    if (m_oldTable != nullptr)
-    {
-        transferNextQuarter();
-    }
-
-    return true;
-}
-
-bool DnaDb::remove(DNA dna)
-{
-    unsigned int index = m_hash(dna.getSequence()) % m_currentCap;
-    int i = 0;
-    unsigned int originalIndex = index;
-    int maxProbes = m_currentCap * 4;
-
-    while (m_currentTable[index] != nullptr && i < maxProbes)
-    {
-        if (m_currentTable[index]->getUsed() && *m_currentTable[index] == dna)
-        {
-            m_currentTable[index]->setUsed(false);
-            m_currNumDeleted++;
-            m_currentSize--;
-            checkRehashCriteria();
-            if (m_oldTable != nullptr)
-            {
-                transferNextQuarter();
-            }
-            return true;
-        }
-        i++;
-        if (m_currProbing == DOUBLEHASH)
-        {
-            int step = 11 - (m_hash(dna.getSequence()) % 11);
-            if (step == 0)
-                step = 1;
-            index = (originalIndex + i * step) % m_currentCap;
-        }
-        else if (m_currProbing == QUADRATIC)
-        {
-            index = (originalIndex + i * i) % m_currentCap;
-        }
-        else
-        {
-            index = (originalIndex + i) % m_currentCap;
-        }
-    }
-
-    if (i >= maxProbes)
-    {
-        index = originalIndex;
-        i = 0;
-        while (m_currentTable[index] != nullptr && i < m_currentCap)
-        {
-            if (m_currentTable[index]->getUsed() && *m_currentTable[index] == dna)
-            {
-                m_currentTable[index]->setUsed(false);
-                m_currNumDeleted++;
-                m_currentSize--;
-                checkRehashCriteria();
-                if (m_oldTable != nullptr)
-                {
-                    transferNextQuarter();
-                }
-                return true;
-            }
-            i++;
-            index = (originalIndex + i) % m_currentCap;
-        }
-    }
-
-    if (m_oldTable != nullptr)
-    {
-        index = m_hash(dna.getSequence()) % m_oldCap;
-        i = 0;
-        originalIndex = index;
-
-        while (m_currentTable[index] != nullptr && i < maxProbes)
-        {
-            if (m_oldTable[index]->getUsed() && *m_oldTable[index] == dna)
-            {
-                m_oldTable[index]->setUsed(false);
-                m_oldNumDeleted++;
-                m_oldSize--;
-                transferNextQuarter();
-                return true;
-            }
-            i++;
-            if (m_oldProbing == DOUBLEHASH)
-            {
-                int step = 11 - (m_hash(dna.getSequence()) % 11);
-                if (step == 0)
-                    step = 1;
-                index = (originalIndex + i * step) % m_oldCap;
-            }
-            else if (m_oldProbing == QUADRATIC)
-            {
-                index = (originalIndex + i * i) % m_oldCap;
-            }
-            else
-            {
-                index = (originalIndex + i) % m_oldCap;
-            }
-        }
-
-        if (i >= maxProbes)
-        {
-            index = originalIndex;
-            i = 0;
-            while (m_oldTable[index] != nullptr && i < m_oldCap)
-            {
-                if (m_oldTable[index]->getUsed() && *m_oldTable[index] == dna)
-                {
-                    m_oldTable[index]->setUsed(false);
-                    m_oldNumDeleted++;
-                    m_oldSize--;
-                    transferNextQuarter();
-                    return true;
-                }
-                i++;
-                index = (originalIndex + i) % m_oldCap;
-            }
-        }
-    }
-
-    return false;
-}
-
-const DNA DnaDb::getDNA(string sequence, int location) const
-{
-    DNA result = getDNAFromTable(sequence, location, m_currentTable, m_currentCap, m_currProbing);
-    if (!result.getSequence().empty() && result.getUsed())
-    {
-        return result;
-    }
-
-    if (m_oldTable != nullptr)
-    {
-        result = getDNAFromTable(sequence, location, m_oldTable, m_oldCap, m_oldProbing);
-        if (!result.getSequence().empty() && result.getUsed())
-        {
-            return result;
-        }
-    }
-
-    return DNA();
-}
-
-bool DnaDb::updateLocId(DNA dna, int location)
-{
-    if (location < MINLOCID || location > MAXLOCID)
-    {
-        return false;
-    }
-
-    unsigned int index = m_hash(dna.getSequence()) % m_currentCap;
-    int i = 0;
-    unsigned int originalIndex = index;
-    int maxProbes = m_currentCap * 4;
-
-    while (m_currentTable[index] != nullptr && i < maxProbes)
-    {
-        if (m_currentTable[index]->getUsed() && *m_currentTable[index] == dna)
-        {
-            m_currentTable[index]->setLocID(location);
-            return true;
-        }
-        i++;
-        if (m_currProbing == DOUBLEHASH)
-        {
-            int step = 11 - (m_hash(dna.getSequence()) % 11);
-            if (step == 0)
-                step = 1;
-            index = (originalIndex + i * step) % m_currentCap;
-        }
-        else if (m_currProbing == QUADRATIC)
-        {
-            index = (originalIndex + i * i) % m_currentCap;
-        }
-        else
-        {
-            index = (originalIndex + i) % m_currentCap;
-        }
-    }
-
-    if (i >= maxProbes)
-    {
-        index = originalIndex;
-        i = 0;
-        while (m_currentTable[index] != nullptr && i < m_currentCap)
-        {
-            if (m_currentTable[index]->getUsed() && *m_currentTable[index] == dna)
-            {
-                m_currentTable[index]->setLocID(location);
-                return true;
-            }
-            i++;
-            index = (originalIndex + i) % m_currentCap;
-        }
-    }
-
-    if (m_oldTable != nullptr)
-    {
-        index = m_hash(dna.getSequence()) % m_oldCap;
-        i = 0;
-        originalIndex = index;
-
-        while (m_oldTable[index] != nullptr && i < maxProbes)
-        {
-            if (m_oldTable[index]->getUsed() && *m_oldTable[index] == dna)
-            {
-                m_oldTable[index]->setLocID(location);
-                return true;
-            }
-            i++;
-            if (m_oldProbing == DOUBLEHASH)
-            {
-                int step = 11 - (m_hash(dna.getSequence()) % 11);
-                if (step == 0)
-                    step = 1;
-                index = (originalIndex + i * step) % m_oldCap;
-            }
-            else if (m_oldProbing == QUADRATIC)
-            {
-                index = (originalIndex + i * i) % m_oldCap;
-            }
-            else
-            {
-                index = (originalIndex + i) % m_oldCap;
-            }
-        }
-
-        if (i >= maxProbes)
-        {
-            index = originalIndex;
-            i = 0;
-            while (m_oldTable[index] != nullptr && i < m_oldCap)
-            {
-                if (m_oldTable[index]->getUsed() && *m_oldTable[index] == dna)
-                {
-                    m_oldTable[index]->setLocID(location);
-                    return true;
-                }
-                i++;
-                index = (originalIndex + i) % m_oldCap;
-            }
-        }
-    }
-
-    return false;
-}
-
-float DnaDb::lambda() const
-{
-    return static_cast<float>(m_currentSize + m_currNumDeleted) / m_currentCap;
-}
-
-float DnaDb::deletedRatio() const
-{
-    if (m_currentSize + m_currNumDeleted == 0)
-    {
-        return 0.0f;
-    }
-    return static_cast<float>(m_currNumDeleted) / (m_currentSize + m_currNumDeleted);
-}
-
-void DnaDb::dump() const
-{
-    cout << "Dump for the current table: " << endl;
-    if (m_currentTable != nullptr)
-    {
-        for (int i = 0; i < m_currentCap; i++)
-        {
-            cout << "[" << i << "] : " << m_currentTable[i] << endl;
-        }
-    }
-    cout << "Dump for the old table: " << endl;
-    if (m_oldTable != nullptr)
-    {
-        for (int i = 0; i < m_oldCap; i++)
-        {
-            cout << "[" << i << "] : " << m_oldTable[i] << endl;
-        }
-    }
-}
-
-bool DnaDb::isPrime(int number)
-{
-    if (number <= 1)
-        return false;
-    for (int i = 2; i <= sqrt(number); i++)
-    {
-        if (number % i == 0)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-int DnaDb::findNextPrime(int current)
-{
-    if (current < MINPRIME)
-        current = MINPRIME - 1;
-    for (int i = current + 1; i <= MAXPRIME; i++)
-    {
-        if (isPrime(i))
-        {
-            return i;
-        }
-    }
-    return MAXPRIME;
-}
-
-DNA DnaDb::getDNAFromTable(string sequence, int location, DNA **table, int cap, prob_t probing) const
-{
-    unsigned int index = m_hash(sequence) % cap;
-    int i = 0;
-    unsigned int originalIndex = index;
-    int maxProbes = cap * 4;
-
-    while (table[index] != nullptr && i < maxProbes)
-    {
-        if (table[index]->getUsed() && table[index]->getSequence() == sequence && table[index]->getLocId() == location)
-        {
-            return *table[index];
-        }
-        i++;
-        if (probing == DOUBLEHASH)
-        {
-            int step = 11 - (m_hash(sequence) % 11);
-            if (step == 0)
-                step = 1;
-            index = (originalIndex + i * step) % cap;
-        }
-        else if (probing == QUADRATIC)
-        {
-            index = (originalIndex + i * i) % cap;
-        }
-        else
-        {
-            index = (originalIndex + i) % cap;
-        }
-    }
-
-    if (i >= maxProbes)
-    {
-        index = originalIndex;
-        i = 0;
-        while (table[index] != nullptr && i < cap)
-        {
-            if (table[index]->getUsed() && table[index]->getSequence() == sequence && table[index]->getLocId() == location)
-            {
-                return *table[index];
-            }
-            i++;
-            index = (originalIndex + i) % cap;
-        }
-    }
-
-    return DNA();
-}
-
+// rehash criteria
 void DnaDb::checkRehashCriteria()
 {
-    if (lambda() > 0.5 || deletedRatio() > 0.8)
-    {
+    // load > .5 or deleted ≥ .8
+    if (lambda() > 0.5f || deletedRatio() >= 0.8f)
         initiateRehash();
-    }
 }
 
+// start a new incremental rehash
 void DnaDb::initiateRehash()
 {
-    int liveEntries = m_currentSize;
-    int newSize = findNextPrime(liveEntries * 12); // Larger table to reduce collisions
-    if (newSize < MINPRIME)
-        newSize = MINPRIME;
-
-    DNA **newTable = new DNA *[newSize]();
-
     m_oldTable = m_currentTable;
     m_oldCap = m_currentCap;
     m_oldSize = m_currentSize;
     m_oldNumDeleted = m_currNumDeleted;
     m_oldProbing = m_currProbing;
 
-    m_currentTable = newTable;
-    m_currentCap = newSize;
     m_currentSize = 0;
     m_currNumDeleted = 0;
-    m_currProbing = m_newPolicy;
     m_transferIndex = 0;
+    m_currentTable = nullptr;
+
+    int newCap = findNextPrime((m_oldSize - m_oldNumDeleted) * 4);
+    m_currentCap = newCap;
+    m_currProbing = m_newPolicy;
+    m_currentTable = new DNA *[m_currentCap];
+    for (int i = 0; i < m_currentCap; i++)
+        m_currentTable[i] = nullptr;
 }
 
+// helper used during transfer
+void DnaDb::rehashInsert(const DNA &dna)
+{
+    unsigned idx = m_hash(dna.getSequence()) % m_currentCap;
+    unsigned i = 0, pos = idx;
+    while (true)
+    {
+        if (!m_currentTable[pos] || !m_currentTable[pos]->m_used)
+        {
+            delete m_currentTable[pos];
+            m_currentTable[pos] = new DNA(dna);
+            m_currentTable[pos]->m_used = true;
+            ++m_currentSize;
+            return;
+        }
+        ++i;
+        if (m_currProbing == LINEAR)
+            pos = (idx + i) % m_currentCap;
+        else if (m_currProbing == QUADRATIC)
+            pos = (idx + i * i) % m_currentCap;
+        else
+            pos = (idx + i * (11 - (m_hash(dna.getSequence()) % 11))) % m_currentCap;
+    }
+}
+
+// move 25% of old‐table entries
 void DnaDb::transferNextQuarter()
 {
-    if (m_oldTable == nullptr)
-    {
+    if (!m_oldTable)
         return;
-    }
-
-    int quarterSize = m_oldCap / 4;
-    if (quarterSize < 1)
-        quarterSize = 1;
-    int endIndex = m_transferIndex + quarterSize;
-    if (endIndex > m_oldCap)
+    int quarter = m_oldCap / 4;
+    int start = m_transferIndex;
+    int end = min(start + quarter, m_oldCap);
+    for (int i = start; i < end; ++i)
     {
-        endIndex = m_oldCap;
-    }
-
-    for (int i = m_transferIndex; i < endIndex && i < m_oldCap; i++)
-    {
-        if (m_oldTable[i] != nullptr && m_oldTable[i]->getUsed())
+        if (m_oldTable[i] && m_oldTable[i]->m_used)
         {
-            DNA temp = *m_oldTable[i];
-            bool inserted = insert(temp);
-            if (inserted)
-            {
-                m_oldTable[i]->setUsed(false);
-                m_oldNumDeleted++;
-                m_oldSize--;
-            }
+            rehashInsert(*m_oldTable[i]);
+            m_oldTable[i]->m_used = false;
         }
     }
-
-    m_transferIndex = endIndex;
-
+    m_transferIndex = end;
     if (m_transferIndex >= m_oldCap)
     {
         for (int i = 0; i < m_oldCap; i++)
-        {
-            if (m_oldTable[i] != nullptr)
-            {
-                delete m_oldTable[i];
-                m_oldTable[i] = nullptr;
-            }
-        }
+            delete m_oldTable[i];
         delete[] m_oldTable;
         m_oldTable = nullptr;
-        m_oldCap = 0;
-        m_oldSize = 0;
-        m_oldNumDeleted = 0;
-        m_transferIndex = 0;
+        m_oldCap = m_oldSize = m_oldNumDeleted = m_transferIndex = 0;
+    }
+}
+
+// debug dump
+void DnaDb::dump() const
+{
+    cout << "Dump for the current table: " << endl;
+    for (int i = 0; i < m_currentCap; ++i)
+        cout << "[" << i << "] : " << m_currentTable[i] << "\n";
+    if (m_oldTable)
+    {
+        cout << "Dump for the old table: " << endl;
+        for (int i = 0; i < m_oldCap; ++i)
+            cout << "[" << i << "] : " << m_oldTable[i] << "\n";
     }
 }

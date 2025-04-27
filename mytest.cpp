@@ -8,6 +8,7 @@ using namespace std;
 
 unsigned int hashCode(const string str);
 string sequencer(int size, int seedNum);
+
 enum RANDOM
 {
     UNIFORMINT,
@@ -175,29 +176,24 @@ public:
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
             DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
-            {
+            if (found.getSequence() != dna.getSequence() ||
+                found.getLocId() != dna.getLocId())
                 return false;
-            }
         }
 
-        if (abs(db.lambda() - static_cast<float>(numInserts) / MINPRIME) > 0.01)
-        {
+        float loadFactor = static_cast<float>(numInserts) / MINPRIME;
+        if (fabs(db.lambda() - loadFactor) > 0.01f)
             return false;
-        }
-
         return true;
     }
 
     bool testGetDNANonExistent()
     {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
-        DNA result = db.getDNA("AAAAA", MINLOCID);
-        return result.getSequence().empty();
+        DNA r = db.getDNA("AAAAA", MINLOCID);
+        return r.getSequence().empty();
     }
 
     bool testGetDNANonColliding()
@@ -212,20 +208,15 @@ public:
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
-
-        for (const auto &dna : inserted)
+        for (auto &dna : inserted)
         {
-            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
-            {
+            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (f.getSequence() != dna.getSequence() ||
+                f.getLocId() != dna.getLocId())
                 return false;
-            }
         }
-
         return true;
     }
 
@@ -242,20 +233,15 @@ public:
             DNA dna(seq, locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
-
-        for (const auto &dna : inserted)
+        for (auto &dna : inserted)
         {
-            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
-            {
+            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (f.getSequence() != dna.getSequence() ||
+                f.getLocId() != dna.getLocId())
                 return false;
-            }
         }
-
         return true;
     }
 
@@ -271,24 +257,16 @@ public:
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
-
-        for (const auto &dna : inserted)
+        for (auto &dna : inserted)
         {
             if (!db.remove(dna))
-            {
                 return false;
-            }
-            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (!found.getSequence().empty())
-            {
+            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (!f.getSequence().empty())
                 return false;
-            }
         }
-
         return true;
     }
 
@@ -305,24 +283,16 @@ public:
             DNA dna(seq, locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
-
-        for (const auto &dna : inserted)
+        for (auto &dna : inserted)
         {
             if (!db.remove(dna))
-            {
                 return false;
-            }
-            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (!found.getSequence().empty())
-            {
+            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (!f.getSequence().empty())
                 return false;
-            }
         }
-
         return true;
     }
 
@@ -332,21 +302,21 @@ public:
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
 
-        int threshold = MINPRIME / 2 + 1;
+        // only trigger rehash once we exceed 50%
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
         for (int i = 0; i < threshold; i++)
         {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
-
+        // now we should be in rehash
         if (db.m_oldTable == nullptr)
-        {
             return false;
-        }
 
+        float loadFactor = static_cast<float>(threshold) / MINPRIME;
+        if (fabs(db.lambda() - loadFactor) > 0.01f)
+            return false;
         return true;
     }
 
@@ -357,40 +327,31 @@ public:
         locGen.setSeed(42);
         vector<DNA> inserted;
 
-        int threshold = MINPRIME / 2 + 1;
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
         for (int i = 0; i < threshold; i++)
         {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
-
-        for (int i = 0; i < 5; i++)
+        // 6 more operations to move all quarters
+        for (int i = 0; i < 6; i++)
         {
             DNA dummy(sequencer(5, threshold + i), locGen.getRandNum(), true);
             if (!db.insert(dummy))
-            {
                 return false;
-            }
         }
-
         if (db.m_oldTable != nullptr)
-        {
             return false;
-        }
 
-        for (const auto &dna : inserted)
+        for (auto &dna : inserted)
         {
-            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
-            {
+            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (f.getSequence() != dna.getSequence() ||
+                f.getLocId() != dna.getLocId())
                 return false;
-            }
         }
-
         return true;
     }
 
@@ -401,29 +362,23 @@ public:
         locGen.setSeed(42);
         vector<DNA> inserted;
 
-        for (int i = 0; i < 10; i++)
+        int numInserts = 20;
+        for (int i = 0; i < numInserts; i++)
         {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
 
-        for (int i = 0; i < 9; i++)
+        int numToDelete = static_cast<int>(numInserts * 0.8);
+        for (int i = 0; i < numToDelete; i++)
         {
             if (!db.remove(inserted[i]))
-            {
                 return false;
-            }
         }
-
         if (db.m_oldTable == nullptr)
-        {
             return false;
-        }
-
         return true;
     }
 
@@ -434,44 +389,40 @@ public:
         locGen.setSeed(42);
         vector<DNA> inserted;
 
-        for (int i = 0; i < 10; i++)
+        int numInserts = 20;
+        for (int i = 0; i < numInserts; i++)
         {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
-            {
                 return false;
-            }
         }
 
-        for (int i = 0; i < 9; i++)
+        int numToDelete = static_cast<int>(numInserts * 0.8);
+        for (int i = 0; i < numToDelete; i++)
         {
             if (!db.remove(inserted[i]))
-            {
                 return false;
-            }
         }
 
-        for (int i = 0; i < 5; i++)
+        // 6 more inserts to finish incremental rehash
+        for (int i = 0; i < 6; i++)
         {
-            DNA dummy(sequencer(5, 10 + i), locGen.getRandNum(), true);
+            DNA dummy(sequencer(5, numInserts + i), locGen.getRandNum(), true);
             if (!db.insert(dummy))
-            {
                 return false;
-            }
         }
 
         if (db.m_oldTable != nullptr)
-        {
             return false;
-        }
 
-        DNA found = db.getDNA(inserted[9].getSequence(), inserted[9].getLocId());
-        if (found.getSequence() != inserted[9].getSequence() || found.getLocId() != inserted[9].getLocId())
+        for (int i = numToDelete; i < numInserts; i++)
         {
-            return false;
+            DNA f = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
+            if (f.getSequence() != inserted[i].getSequence() ||
+                f.getLocId() != inserted[i].getLocId())
+                return false;
         }
-
         return true;
     }
 };
@@ -517,19 +468,19 @@ int main()
     if (result)
         cout << "\tAll data points exist in the DnaDb object!\n";
 
-    Tester tester;
-    cout << "Testing DnaDb implementation:\n";
+        Tester tester;
+        cout << "Testing DnaDb implementation:\n";
+        cout << "testInsertNonColliding: "            << (tester.testInsertNonColliding()            ? "PASS\n" : "FAIL\n");
+        cout << "testGetDNANonExistent: "             << (tester.testGetDNANonExistent()             ? "PASS\n" : "FAIL\n");
+        cout << "testGetDNANonColliding: "            << (tester.testGetDNANonColliding()            ? "PASS\n" : "FAIL\n");
+        cout << "testGetDNAColliding: "               << (tester.testGetDNAColliding()               ? "PASS\n" : "FAIL\n");
+        cout << "testRemoveNonColliding: "            << (tester.testRemoveNonColliding()            ? "PASS\n" : "FAIL\n");
+        cout << "testRemoveColliding: "               << (tester.testRemoveColliding()               ? "PASS\n" : "FAIL\n");
+        cout << "testRehashLoadFactor: "              << (tester.testRehashLoadFactor()              ? "PASS\n" : "FAIL\n");
+        cout << "testRehashCompletionLoadFactor: "    << (tester.testRehashCompletionLoadFactor()    ? "PASS\n" : "FAIL\n");
+        cout << "testRehashDeleteRatio: "             << (tester.testRehashDeleteRatio()             ? "PASS\n" : "FAIL\n");
+        cout << "testRehashCompletionDeleteRatio: "   << (tester.testRehashCompletionDeleteRatio()   ? "PASS\n" : "FAIL\n");
 
-    cout << "testInsertNonColliding: " << (tester.testInsertNonColliding() ? "PASS" : "FAIL") << endl;
-    cout << "testGetDNANonExistent: " << (tester.testGetDNANonExistent() ? "PASS" : "FAIL") << endl;
-    cout << "testGetDNANonColliding: " << (tester.testGetDNANonColliding() ? "PASS" : "FAIL") << endl;
-    cout << "testGetDNAColliding: " << (tester.testGetDNAColliding() ? "PASS" : "FAIL") << endl;
-    cout << "testRemoveNonColliding: " << (tester.testRemoveNonColliding() ? "PASS" : "FAIL") << endl;
-    cout << "testRemoveColliding: " << (tester.testRemoveColliding() ? "PASS" : "FAIL") << endl;
-    cout << "testRehashLoadFactor: " << (tester.testRehashLoadFactor() ? "PASS" : "FAIL") << endl;
-    cout << "testRehashCompletionLoadFactor: " << (tester.testRehashCompletionLoadFactor() ? "PASS" : "FAIL") << endl;
-    cout << "testRehashDeleteRatio: " << (tester.testRehashDeleteRatio() ? "PASS" : "FAIL") << endl;
-    cout << "testRehashCompletionDeleteRatio: " << (tester.testRehashCompletionDeleteRatio() ? "PASS" : "FAIL") << endl;
     return 0;
 }
 

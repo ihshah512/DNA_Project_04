@@ -133,9 +133,13 @@ private:
     /******************************************
      * Private function declarations go here! *
      ******************************************/
-    DNA getDNAFromTable(string sequence, int location, DNA **table, int cap, prob_t probing) const;
+    DNA getDNAFromTable(string sequence, int location,
+                        DNA **table, int cap, prob_t probing) const;
     void checkRehashCriteria();
     void initiateRehash();
     void transferNextQuarter();
+
+    // new helper to move items into the new table without recursion
+    void rehashInsert(const DNA &dna);
 };
 #endif
