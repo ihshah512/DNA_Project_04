@@ -249,9 +249,11 @@ void DnaDb::changeProbPolicy(prob_t policy)
 // rehash criteria
 void DnaDb::checkRehashCriteria()
 {
-    // load > .5 or deleted ≥ .8
-    if (lambda() > 0.5f || deletedRatio() >= 0.8f)
+    // only start a rehash if one isn’t already in progress
+    if (!m_oldTable && (lambda() > 0.5f || deletedRatio() >= 0.8f))
+    {
         initiateRehash();
+    }
 }
 
 // start a new incremental rehash

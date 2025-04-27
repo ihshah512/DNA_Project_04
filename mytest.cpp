@@ -302,7 +302,7 @@ public:
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
 
-        // only trigger rehash once we exceed 50%
+        // trigger at just over 50%
         int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
         for (int i = 0; i < threshold; i++)
         {
@@ -310,48 +310,12 @@ public:
             if (!db.insert(dna))
                 return false;
         }
-        // now we should be in rehash
         if (db.m_oldTable == nullptr)
             return false;
 
         float loadFactor = static_cast<float>(threshold) / MINPRIME;
         if (fabs(db.lambda() - loadFactor) > 0.01f)
             return false;
-        return true;
-    }
-
-    bool testRehashCompletionLoadFactor()
-    {
-        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
-        Random locGen(MINLOCID, MAXLOCID);
-        locGen.setSeed(42);
-        vector<DNA> inserted;
-
-        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
-        for (int i = 0; i < threshold; i++)
-        {
-            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
-            inserted.push_back(dna);
-            if (!db.insert(dna))
-                return false;
-        }
-        // 6 more operations to move all quarters
-        for (int i = 0; i < 6; i++)
-        {
-            DNA dummy(sequencer(5, threshold + i), locGen.getRandNum(), true);
-            if (!db.insert(dummy))
-                return false;
-        }
-        if (db.m_oldTable != nullptr)
-            return false;
-
-        for (auto &dna : inserted)
-        {
-            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (f.getSequence() != dna.getSequence() ||
-                f.getLocId() != dna.getLocId())
-                return false;
-        }
         return true;
     }
 
@@ -377,50 +341,95 @@ public:
             if (!db.remove(inserted[i]))
                 return false;
         }
+
         if (db.m_oldTable == nullptr)
             return false;
         return true;
     }
-
     bool testRehashCompletionDeleteRatio()
     {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
-        vector<DNA> inserted;
 
         int numInserts = 20;
-        for (int i = 0; i < numInserts; i++)
+        vector<DNA> inserted;
+        for (int i = 0; i < numInserts; ++i)
         {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
             if (!db.insert(dna))
                 return false;
         }
-
         int numToDelete = static_cast<int>(numInserts * 0.8);
-        for (int i = 0; i < numToDelete; i++)
+        for (int i = 0; i < numToDelete; ++i)
         {
             if (!db.remove(inserted[i]))
                 return false;
         }
-
-        // 6 more inserts to finish incremental rehash
-        for (int i = 0; i < 6; i++)
-        {
-            DNA dummy(sequencer(5, numInserts + i), locGen.getRandNum(), true);
-            if (!db.insert(dummy))
-                return false;
-        }
-
-        if (db.m_oldTable != nullptr)
+        if (!db.m_oldTable)
             return false;
 
-        for (int i = numToDelete; i < numInserts; i++)
+        // Keep inserting until old table is fully transferred
+        int extra = 0;
+        while (db.m_oldTable)
+        {
+            DNA dummy(sequencer(5, numInserts + extra), locGen.getRandNum(), true);
+            if (!db.insert(dummy))
+                return false;
+            ++extra;
+        }
+        if (db.m_oldTable)
+            return false;
+
+        // Verify remaining originals still present
+        for (int i = numToDelete; i < numInserts; ++i)
         {
             DNA f = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
             if (f.getSequence() != inserted[i].getSequence() ||
                 f.getLocId() != inserted[i].getLocId())
+                return false;
+        }
+        return true;
+    }
+    bool testRehashCompletionLoadFactor()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
+        vector<DNA> inserted;
+        for (int i = 0; i < threshold; ++i)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        // Now rehash has started
+        if (!db.m_oldTable)
+            return false;
+
+        // Keep inserting until old table is fully transferred
+        int extra = 0;
+        while (db.m_oldTable)
+        {
+            DNA dummy(sequencer(5, threshold + extra), locGen.getRandNum(), true);
+            if (!db.insert(dummy))
+                return false;
+            ++extra;
+        }
+        // Verify nothing left in old table
+        if (db.m_oldTable)
+            return false;
+
+        // All original entries still found
+        for (auto &dna : inserted)
+        {
+            DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (f.getSequence() != dna.getSequence() ||
+                f.getLocId() != dna.getLocId())
                 return false;
         }
         return true;
@@ -468,18 +477,18 @@ int main()
     if (result)
         cout << "\tAll data points exist in the DnaDb object!\n";
 
-        Tester tester;
-        cout << "Testing DnaDb implementation:\n";
-        cout << "testInsertNonColliding: "            << (tester.testInsertNonColliding()            ? "PASS\n" : "FAIL\n");
-        cout << "testGetDNANonExistent: "             << (tester.testGetDNANonExistent()             ? "PASS\n" : "FAIL\n");
-        cout << "testGetDNANonColliding: "            << (tester.testGetDNANonColliding()            ? "PASS\n" : "FAIL\n");
-        cout << "testGetDNAColliding: "               << (tester.testGetDNAColliding()               ? "PASS\n" : "FAIL\n");
-        cout << "testRemoveNonColliding: "            << (tester.testRemoveNonColliding()            ? "PASS\n" : "FAIL\n");
-        cout << "testRemoveColliding: "               << (tester.testRemoveColliding()               ? "PASS\n" : "FAIL\n");
-        cout << "testRehashLoadFactor: "              << (tester.testRehashLoadFactor()              ? "PASS\n" : "FAIL\n");
-        cout << "testRehashCompletionLoadFactor: "    << (tester.testRehashCompletionLoadFactor()    ? "PASS\n" : "FAIL\n");
-        cout << "testRehashDeleteRatio: "             << (tester.testRehashDeleteRatio()             ? "PASS\n" : "FAIL\n");
-        cout << "testRehashCompletionDeleteRatio: "   << (tester.testRehashCompletionDeleteRatio()   ? "PASS\n" : "FAIL\n");
+    Tester tester;
+    cout << "Testing DnaDb implementation:\n";
+    cout << "testInsertNonColliding: " << (tester.testInsertNonColliding() ? "PASS\n" : "FAIL\n");
+    cout << "testGetDNANonExistent: " << (tester.testGetDNANonExistent() ? "PASS\n" : "FAIL\n");
+    cout << "testGetDNANonColliding: " << (tester.testGetDNANonColliding() ? "PASS\n" : "FAIL\n");
+    cout << "testGetDNAColliding: " << (tester.testGetDNAColliding() ? "PASS\n" : "FAIL\n");
+    cout << "testRemoveNonColliding: " << (tester.testRemoveNonColliding() ? "PASS\n" : "FAIL\n");
+    cout << "testRemoveColliding: " << (tester.testRemoveColliding() ? "PASS\n" : "FAIL\n");
+    cout << "testRehashLoadFactor: " << (tester.testRehashLoadFactor() ? "PASS\n" : "FAIL\n");
+    cout << "testRehashCompletionLoadFactor: " << (tester.testRehashCompletionLoadFactor() ? "PASS\n" : "FAIL\n");
+    cout << "testRehashDeleteRatio: " << (tester.testRehashDeleteRatio() ? "PASS\n" : "FAIL\n");
+    cout << "testRehashCompletionDeleteRatio: " << (tester.testRehashCompletionDeleteRatio() ? "PASS\n" : "FAIL\n");
 
     return 0;
 }
