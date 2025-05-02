@@ -136,8 +136,10 @@ private:
     DNA getDNAFromTable(string sequence, int location,
                         DNA **table, int cap, prob_t probing) const;
     void checkRehashCriteria();
+    DnaDb(const DnaDb& other);
     void initiateRehash();
     void transferNextQuarter();
+    DnaDb& operator=(const DnaDb &other);
 
     // new helper to move items into the new table without recursion
     void rehashInsert(const DNA &dna);

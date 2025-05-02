@@ -1,9 +1,5 @@
-// dnadb.cpp
 #include "dnadb.h"
-#include <iostream>
-#include <string>
-#include <algorithm> // for std::min
-using namespace std;
+#include <iostream> // Only used for dump(), remove if not allowed
 
 // Constructor
 DnaDb::DnaDb(int size, hash_fn hash, prob_t probing)
@@ -16,8 +12,9 @@ DnaDb::DnaDb(int size, hash_fn hash, prob_t probing)
     m_oldSize = 0;
     m_oldNumDeleted = 0;
     m_transferIndex = 0;
+    m_oldProbing = probing;
 
-    // enforce prime bounds
+    // Enforce prime bounds
     if (size < MINPRIME)
         size = MINPRIME;
     if (size > MAXPRIME)
@@ -33,23 +30,121 @@ DnaDb::DnaDb(int size, hash_fn hash, prob_t probing)
         m_currentTable[i] = nullptr;
 }
 
-// Destructor
-DnaDb::~DnaDb()
+// Copy Constructor
+// Copy Constructor (fixed definition)
+DnaDb::DnaDb(const DnaDb& other) :
+    m_hash(other.m_hash),
+    m_currProbing(other.m_currProbing),
+    m_newPolicy(other.m_newPolicy),
+    m_currentCap(other.m_currentCap),
+    m_currentSize(other.m_currentSize),
+    m_currNumDeleted(other.m_currNumDeleted),
+    m_oldCap(other.m_oldCap),
+    m_oldSize(other.m_oldSize),
+    m_oldNumDeleted(other.m_oldNumDeleted),
+    m_transferIndex(other.m_transferIndex),
+    m_oldProbing(other.m_oldProbing),
+    m_currentTable(nullptr),
+    m_oldTable(nullptr)
 {
-    if (m_currentTable)
-    {
-        for (int i = 0; i < m_currentCap; i++)
-            delete m_currentTable[i];
-        delete[] m_currentTable;
+    // Copy current table
+    if (other.m_currentTable) {
+        m_currentTable = new DNA*[m_currentCap];
+        for (int i = 0; i < m_currentCap; i++) {
+            if (other.m_currentTable[i] && other.m_currentTable[i]->m_used) {
+                m_currentTable[i] = new DNA(*other.m_currentTable[i]);
+            } else {
+                m_currentTable[i] = nullptr;
+            }
+        }
     }
-    if (m_oldTable)
-    {
-        for (int i = 0; i < m_oldCap; i++)
-            delete m_oldTable[i];
-        delete[] m_oldTable;
+
+    // Copy old table if it exists
+    if (other.m_oldTable) {
+        m_oldTable = new DNA*[m_oldCap];
+        for (int i = 0; i < m_oldCap; i++) {
+            if (other.m_oldTable[i] && other.m_oldTable[i]->m_used) {
+                m_oldTable[i] = new DNA(*other.m_oldTable[i]);
+            } else {
+                m_oldTable[i] = nullptr;
+            }
+        }
     }
 }
 
+// Assignment Operator (without swap)
+DnaDb& DnaDb::operator=(const DnaDb& other) {
+    if (this != &other) {  // Check for self-assignment
+        // Clean up existing resources
+        if (m_currentTable) {
+            for (int i = 0; i < m_currentCap; i++) {
+                delete m_currentTable[i];
+            }
+            delete[] m_currentTable;
+        }
+        if (m_oldTable) {
+            for (int i = 0; i < m_oldCap; i++) {
+                delete m_oldTable[i];
+            }
+            delete[] m_oldTable;
+        }
+
+        // Copy primitive members
+        m_hash = other.m_hash;
+        m_currProbing = other.m_currProbing;
+        m_newPolicy = other.m_newPolicy;
+        m_currentCap = other.m_currentCap;
+        m_currentSize = other.m_currentSize;
+        m_currNumDeleted = other.m_currNumDeleted;
+        m_oldCap = other.m_oldCap;
+        m_oldSize = other.m_oldSize;
+        m_oldNumDeleted = other.m_oldNumDeleted;
+        m_transferIndex = other.m_transferIndex;
+        m_oldProbing = other.m_oldProbing;
+
+        // Copy current table
+        m_currentTable = new DNA*[m_currentCap];
+        for (int i = 0; i < m_currentCap; i++) {
+            m_currentTable[i] = nullptr;
+            if (other.m_currentTable[i] && other.m_currentTable[i]->m_used) {
+                m_currentTable[i] = new DNA(*other.m_currentTable[i]);
+            }
+        }
+
+        // Copy old table if it exists
+        m_oldTable = nullptr;
+        if (other.m_oldTable) {
+            m_oldTable = new DNA*[m_oldCap];
+            for (int i = 0; i < m_oldCap; i++) {
+                m_oldTable[i] = nullptr;
+                if (other.m_oldTable[i] && other.m_oldTable[i]->m_used) {
+                    m_oldTable[i] = new DNA(*other.m_oldTable[i]);
+                }
+            }
+        }
+    }
+    return *this;
+}
+
+// Destructor
+DnaDb::~DnaDb()
+{
+    // Clean up current table if it exists and is different from old table
+    if (m_currentTable && m_currentTable != m_oldTable) {
+        for (int i = 0; i < m_currentCap; i++) {
+            delete m_currentTable[i];
+        }
+        delete[] m_currentTable;
+    }
+
+    // Clean up old table if it exists and is different from current table
+    if (m_oldTable) {
+        for (int i = 0; i < m_oldCap; i++) {
+            delete m_oldTable[i];
+        }
+        delete[] m_oldTable;
+    }
+}
 // Load factor — during rehash show old-table’s load, otherwise current
 float DnaDb::lambda() const
 {
@@ -103,8 +198,8 @@ int DnaDb::findNextPrime(int current)
 // Public insert
 bool DnaDb::insert(DNA dna)
 {
-    // invalid loc ID?
-    if (dna.getLocId() < MINLOCID || dna.getLocId() > MAXLOCID)
+    // invalid loc ID or empty sequence?
+    if (dna.getLocId() < MINLOCID || dna.getLocId() > MAXLOCID || dna.getSequence().empty())
         return false;
     // no duplicates
     if (getDNA(dna.getSequence(), dna.getLocId()).getSequence() != "")
@@ -120,7 +215,11 @@ bool DnaDb::insert(DNA dna)
     {
         if (!m_currentTable[pos] || !m_currentTable[pos]->m_used)
         {
-            delete m_currentTable[pos];
+            if (m_currentTable[pos])
+            {
+                delete m_currentTable[pos];
+                m_currentTable[pos] = nullptr;
+            }
             m_currentTable[pos] = new DNA(dna);
             m_currentTable[pos]->m_used = true;
             ++m_currentSize;
@@ -281,16 +380,24 @@ void DnaDb::initiateRehash()
 // helper used during transfer
 void DnaDb::rehashInsert(const DNA &dna)
 {
+    //cout << "rehashInsert: sequence=" << dna.getSequence() << ", loc=" << dna.getLocId() << endl;
     unsigned idx = m_hash(dna.getSequence()) % m_currentCap;
     unsigned i = 0, pos = idx;
-    while (true)
+    unsigned max_attempts = m_currentCap; // Prevent infinite loop
+    while (i < max_attempts)
     {
         if (!m_currentTable[pos] || !m_currentTable[pos]->m_used)
         {
-            delete m_currentTable[pos];
+            if (m_currentTable[pos])
+            {
+                //cout << "Deleting existing at pos=" << pos << endl;
+                delete m_currentTable[pos];
+                m_currentTable[pos] = nullptr;
+            }
             m_currentTable[pos] = new DNA(dna);
             m_currentTable[pos]->m_used = true;
             ++m_currentSize;
+            //cout << "Inserted at pos=" << pos << endl;
             return;
         }
         ++i;
@@ -301,6 +408,9 @@ void DnaDb::rehashInsert(const DNA &dna)
         else
             pos = (idx + i * (11 - (m_hash(dna.getSequence()) % 11))) % m_currentCap;
     }
+    // Table full; return without inserting (should not happen due to rehash sizing)
+    //cout << "Warning: Cannot insert, table full" << endl;
+    return;
 }
 
 // move 25% of old‐table entries
@@ -310,20 +420,30 @@ void DnaDb::transferNextQuarter()
         return;
     int quarter = m_oldCap / 4;
     int start = m_transferIndex;
-    int end = min(start + quarter, m_oldCap);
+    int end = start + quarter < m_oldCap ? start + quarter : m_oldCap; // Replace std::min
+    //cout << "Transferring from " << start << " to " << end << endl;
     for (int i = start; i < end; ++i)
     {
         if (m_oldTable[i] && m_oldTable[i]->m_used)
         {
+            //cout << "Transferring DNA at index " << i << ": seq=" << m_oldTable[i]->getSequence() << endl;
             rehashInsert(*m_oldTable[i]);
             m_oldTable[i]->m_used = false;
+            // Mark as transferred but don’t delete yet
         }
     }
     m_transferIndex = end;
     if (m_transferIndex >= m_oldCap)
     {
+        //cout << "Cleaning up old table" << endl;
         for (int i = 0; i < m_oldCap; i++)
-            delete m_oldTable[i];
+        {
+            if (m_oldTable[i])
+            {
+                delete m_oldTable[i];
+                m_oldTable[i] = nullptr;
+            }
+        }
         delete[] m_oldTable;
         m_oldTable = nullptr;
         m_oldCap = m_oldSize = m_oldNumDeleted = m_transferIndex = 0;
