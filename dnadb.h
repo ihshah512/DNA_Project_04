@@ -135,7 +135,7 @@ private:
      ******************************************/
     DNA getDNAFromTable(string sequence, int location,
                         DNA **table, int cap, prob_t probing) const;
-    void checkRehashCriteria();
+    void checkRehashCriteria();//this helper funciton will be used in insert funciton
     DnaDb(const DnaDb& other);
     void initiateRehash();
     void transferNextQuarter();

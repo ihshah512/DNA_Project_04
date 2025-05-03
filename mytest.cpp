@@ -163,382 +163,807 @@ private:
 class Tester
 {
 public:
-   bool testInsertNonColliding() {
+    bool testInsertNonColliding()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
         int numInserts = 10;
-        for (int i = 0; i < numInserts; i++) {
+        for (int i = 0; i < numInserts; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
             DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId()) return false;
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
         }
         float loadFactor = static_cast<float>(numInserts) / MINPRIME;
-        if (fabs(db.lambda() - loadFactor) > 0.01f) return false;
+        if (fabs(db.lambda() - loadFactor) > 0.01f)
+            return false;
         return true;
     }
-    bool testGetDNANonExistent() {
+    bool testGetDNANonExistent()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         DNA r = db.getDNA("AAAAA", MINLOCID);
         return r.getSequence().empty();
     }
-    bool testGetDNANonColliding() {
+    bool testGetDNANonColliding()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (auto &dna : inserted) {
+        for (auto &dna : inserted)
+        {
             DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (f.getSequence() != dna.getSequence() || f.getLocId() != dna.getLocId()) return false;
+            if (f.getSequence() != dna.getSequence() || f.getLocId() != dna.getLocId())
+                return false;
         }
         return true;
     }
-    bool testGetDNAColliding() {
+    bool testGetDNAColliding()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
         string seq = sequencer(5, 1);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++)
+        {
             DNA dna(seq, locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (auto &dna : inserted) {
+        for (auto &dna : inserted)
+        {
             DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (f.getSequence() != dna.getSequence() || f.getLocId() != dna.getLocId()) return false;
+            if (f.getSequence() != dna.getSequence() || f.getLocId() != dna.getLocId())
+                return false;
         }
         return true;
     }
-    bool testRemoveNonColliding() {
+    bool testRemoveNonColliding()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (auto &dna : inserted) {
-            if (!db.remove(dna)) return false;
+        for (auto &dna : inserted)
+        {
+            if (!db.remove(dna))
+                return false;
             DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (!f.getSequence().empty()) return false;
+            if (!f.getSequence().empty())
+                return false;
         }
         return true;
     }
-    bool testRemoveColliding() {
+    bool testRemoveColliding()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
         string seq = sequencer(5, 1);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++)
+        {
             DNA dna(seq, locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (auto &dna : inserted) {
-            if (!db.remove(dna)) return false;
+        for (auto &dna : inserted)
+        {
+            if (!db.remove(dna))
+                return false;
             DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (!f.getSequence().empty()) return false;
+            if (!f.getSequence().empty())
+                return false;
         }
         return true;
     }
-    bool testRehashLoadFactor() {
+    bool testRehashLoadFactor()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
-        for (int i = 0; i < threshold; i++) {
+        for (int i = 0; i < threshold; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        if (db.m_oldTable == nullptr) return false;
+        if (db.m_oldTable == nullptr)
+            return false;
         float loadFactor = static_cast<float>(threshold) / MINPRIME;
-        if (fabs(db.lambda() - loadFactor) > 0.01f) return false;
+        if (fabs(db.lambda() - loadFactor) > 0.01f)
+            return false;
         return true;
     }
-    bool testRehashDeleteRatio() {
+    bool testRehashDeleteRatio()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
         int numInserts = 20;
-        for (int i = 0; i < numInserts; i++) {
+        for (int i = 0; i < numInserts; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
         int numToDelete = static_cast<int>(numInserts * 0.8);
-        for (int i = 0; i < numToDelete; i++) {
-            if (!db.remove(inserted[i])) return false;
+        for (int i = 0; i < numToDelete; i++)
+        {
+            if (!db.remove(inserted[i]))
+                return false;
         }
-        if (db.m_oldTable == nullptr) return false;
+        if (db.m_oldTable == nullptr)
+            return false;
         return true;
     }
-    bool testRehashCompletionDeleteRatio() {
+    bool testRehashCompletionDeleteRatio()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         int numInserts = 20;
         vector<DNA> inserted;
-        for (int i = 0; i < numInserts; ++i) {
+        for (int i = 0; i < numInserts; ++i)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
         int numToDelete = static_cast<int>(numInserts * 0.8);
-        for (int i = 0; i < numToDelete; ++i) {
-            if (!db.remove(inserted[i])) return false;
+        for (int i = 0; i < numToDelete; ++i)
+        {
+            if (!db.remove(inserted[i]))
+                return false;
         }
-        if (!db.m_oldTable) return false;
+        if (!db.m_oldTable)
+            return false;
         int extra = 0;
-        while (db.m_oldTable) {
+        while (db.m_oldTable)
+        {
             DNA dummy(sequencer(5, numInserts + extra), locGen.getRandNum(), true);
-            if (!db.insert(dummy)) return false;
+            if (!db.insert(dummy))
+                return false;
             ++extra;
         }
-        if (db.m_oldTable) return false;
-        for (int i = numToDelete; i < numInserts; ++i) {
+        if (db.m_oldTable)
+            return false;
+        for (int i = numToDelete; i < numInserts; ++i)
+        {
             DNA f = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
-            if (f.getSequence() != inserted[i].getSequence() || f.getLocId() != inserted[i].getLocId()) return false;
+            if (f.getSequence() != inserted[i].getSequence() || f.getLocId() != inserted[i].getLocId())
+                return false;
         }
         return true;
     }
-    bool testRehashCompletionLoadFactor() {
+    bool testRehashCompletionLoadFactor()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
         vector<DNA> inserted;
-        for (int i = 0; i < threshold; ++i) {
+        for (int i = 0; i < threshold; ++i)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        if (!db.m_oldTable) return false;
+        if (!db.m_oldTable)
+            return false;
         int extra = 0;
-        while (db.m_oldTable) {
+        while (db.m_oldTable)
+        {
             DNA dummy(sequencer(5, threshold + extra), locGen.getRandNum(), true);
-            if (!db.insert(dummy)) return false;
+            if (!db.insert(dummy))
+                return false;
             ++extra;
         }
-        if (db.m_oldTable) return false;
-        for (auto &dna : inserted) {
+        if (db.m_oldTable)
+            return false;
+        for (auto &dna : inserted)
+        {
             DNA f = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (f.getSequence() != dna.getSequence() || f.getLocId() != dna.getLocId()) return false;
+            if (f.getSequence() != dna.getSequence() || f.getLocId() != dna.getLocId())
+                return false;
         }
         return true;
     }
-    bool testInsertInvalidLocId() {
+    bool testInsertInvalidLocId()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         DNA dna("AAAAA", MINLOCID - 1);
-        if (db.insert(dna)) return false;
+        if (db.insert(dna))
+            return false;
         dna.setLocID(MAXLOCID + 1);
-        if (db.insert(dna)) return false;
+        if (db.insert(dna))
+            return false;
         return true;
     }
-    bool testInsertEmptySequence() {
+    bool testInsertEmptySequence()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         DNA dna("", locGen.getRandNum());
-        if (db.insert(dna)) return false;
+        if (db.insert(dna))
+            return false;
         DNA found = db.getDNA("", dna.getLocId());
-        if (!found.getSequence().empty()) return false;
+        if (!found.getSequence().empty())
+            return false;
         return true;
     }
-    bool testUpdateLocIdExisting() {
+    bool testUpdateLocIdExisting()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         DNA dna("AAAAA", locGen.getRandNum(), true);
-        if (!db.insert(dna)) return false;
+        if (!db.insert(dna))
+            return false;
         int newLoc = locGen.getRandNum();
-        if (!db.updateLocId(dna, newLoc)) return false;
+        if (!db.updateLocId(dna, newLoc))
+            return false;
         DNA found = db.getDNA(dna.getSequence(), newLoc);
-        if (found.getSequence() != dna.getSequence() || found.getLocId() != newLoc) return false;
+        if (found.getSequence() != dna.getSequence() || found.getLocId() != newLoc)
+            return false;
         found = db.getDNA(dna.getSequence(), dna.getLocId());
-        if (!found.getSequence().empty()) return false;
+        if (!found.getSequence().empty())
+            return false;
         return true;
     }
-    bool testUpdateLocIdNonExistent() {
+    bool testUpdateLocIdNonExistent()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         DNA dna("AAAAA", MINLOCID);
-        if (db.updateLocId(dna, MINLOCID + 1)) return false;
+        if (db.updateLocId(dna, MINLOCID + 1))
+            return false;
         return true;
     }
-    bool testChangeProbingPolicy() {
+    bool testChangeProbingPolicy()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
         db.changeProbPolicy(LINEAR);
         int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
-        for (int i = 5; i < threshold; i++) {
+        for (int i = 5; i < threshold; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (auto &dna : inserted) {
+        for (auto &dna : inserted)
+        {
             DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId()) return false;
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
         }
         return true;
     }
-    bool testCopyConstructor() {
+    bool testCopyConstructor()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        while (db.m_oldTable) {
+        while (db.m_oldTable)
+        {
             db.transferNextQuarter();
         }
         DnaDb copy(db);
-        for (auto &dna : inserted) {
+        for (auto &dna : inserted)
+        {
             DNA found = copy.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId()) return false;
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
         }
         db.remove(inserted[0]);
         DNA found = copy.getDNA(inserted[0].getSequence(), inserted[0].getLocId());
-        if (found.getSequence() != inserted[0].getSequence() || found.getLocId() != inserted[0].getLocId()) return false;
+        if (found.getSequence() != inserted[0].getSequence() || found.getLocId() != inserted[0].getLocId())
+            return false;
         return true;
     }
-    bool testCopyConstructorEmpty() {
+    bool testCopyConstructorEmpty()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         DnaDb copy(db);
         DNA found = copy.getDNA("AAAAA", MINLOCID);
-        if (!found.getSequence().empty()) return false;
-        if (copy.lambda() != 0.0f || copy.deletedRatio() != 0.0f) return false;
+        if (!found.getSequence().empty())
+            return false;
+        if (copy.lambda() != 0.0f || copy.deletedRatio() != 0.0f)
+            return false;
         return true;
     }
-    bool testAssignmentOperator() {
+    bool testAssignmentOperator()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        while (db.m_oldTable) {
+        while (db.m_oldTable)
+        {
             db.transferNextQuarter();
         }
         DnaDb other(MINPRIME, hashCode, LINEAR);
         other = db;
-        for (auto &dna : inserted) {
+        for (auto &dna : inserted)
+        {
             DNA found = other.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId()) return false;
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
         }
         db.remove(inserted[0]);
         DNA found = other.getDNA(inserted[0].getSequence(), inserted[0].getLocId());
-        if (found.getSequence() != inserted[0].getSequence() || found.getLocId() != inserted[0].getLocId()) return false;
+        if (found.getSequence() != inserted[0].getSequence() || found.getLocId() != inserted[0].getLocId())
+            return false;
         return true;
     }
-    bool testAssignmentOperatorEmpty() {
+    bool testAssignmentOperatorEmpty()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         DnaDb other(MINPRIME, hashCode, LINEAR);
         other = db;
         DNA found = other.getDNA("AAAAA", MINLOCID);
-        if (!found.getSequence().empty()) return false;
-        if (other.lambda() != 0.0f || other.deletedRatio() != 0.0f) return false;
+        if (!found.getSequence().empty())
+            return false;
+        if (other.lambda() != 0.0f || other.deletedRatio() != 0.0f)
+            return false;
         return true;
     }
-    bool testDeepCopyDuringRehash() {
+    bool testDeepCopyDuringRehash()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
         int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
-        for (int i = 0; i < threshold; i++) {
+        for (int i = 0; i < threshold; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        while (db.m_oldTable) {
+        while (db.m_oldTable)
+        {
             db.transferNextQuarter();
         }
         DnaDb copy(db);
-        for (auto &dna : inserted) {
+        for (auto &dna : inserted)
+        {
             DNA found = copy.getDNA(dna.getSequence(), dna.getLocId());
-            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId()) return false;
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
         }
         return true;
     }
-    bool testAllProbingPolicies() {
+    bool testAllProbingPolicies()
+    {
         prob_t policies[] = {LINEAR, QUADRATIC, DOUBLEHASH};
-        for (prob_t policy : policies) {
+        for (prob_t policy : policies)
+        {
             DnaDb db(MINPRIME, hashCode, policy);
             Random locGen(MINLOCID, MAXLOCID);
             locGen.setSeed(42);
             vector<DNA> inserted;
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 10; i++)
+            {
                 DNA dna(sequencer(5, i), locGen.getRandNum(), true);
                 inserted.push_back(dna);
-                if (!db.insert(dna)) return false;
+                if (!db.insert(dna))
+                    return false;
             }
-            for (auto &dna : inserted) {
+            for (auto &dna : inserted)
+            {
                 DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
-                if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId()) return false;
+                if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                    return false;
             }
         }
         return true;
     }
-    bool testInsertAfterMultipleRemoves() {
+    bool testInsertAfterMultipleRemoves()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
         Random locGen(MINLOCID, MAXLOCID);
         locGen.setSeed(42);
         vector<DNA> inserted;
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 20; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (int i = 0; i < 15; i++) {
-            if (!db.remove(inserted[i])) return false;
+        for (int i = 0; i < 15; i++)
+        {
+            if (!db.remove(inserted[i]))
+                return false;
         }
-        for (int i = 20; i < 25; i++) {
+        for (int i = 20; i < 25; i++)
+        {
             DNA dna(sequencer(5, i), locGen.getRandNum(), true);
             inserted.push_back(dna);
-            if (!db.insert(dna)) return false;
+            if (!db.insert(dna))
+                return false;
         }
-        for (int i = 15; i < 25; i++) {
+        for (int i = 15; i < 25; i++)
+        {
             DNA found = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
-            if (found.getSequence() != inserted[i].getSequence() || found.getLocId() != inserted[i].getLocId()) return false;
+            if (found.getSequence() != inserted[i].getSequence() || found.getLocId() != inserted[i].getLocId())
+                return false;
         }
         return true;
     }
-    bool testEmptyTableOperations() {
+    bool testEmptyTableOperations()
+    {
         DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
-        if (db.lambda() != 0.0f || db.deletedRatio() != 0.0f) return false;
+        if (db.lambda() != 0.0f || db.deletedRatio() != 0.0f)
+            return false;
         DNA dna("AAAAA", MINLOCID);
-        if (db.remove(dna)) return false;
-        if (!db.getDNA("AAAAA", MINLOCID).getSequence().empty()) return false;
-        if (db.updateLocId(dna, MINLOCID + 1)) return false;
+        if (db.remove(dna))
+            return false;
+        if (!db.getDNA("AAAAA", MINLOCID).getSequence().empty())
+            return false;
+        if (db.updateLocId(dna, MINLOCID + 1))
+            return false;
+        return true;
+    }
+    bool testComplexOperations()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        vector<DNA> inserted;
+        for (int i = 0; i < 30; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        for (int i = 0; i < 10; i++)
+        {
+            if (!db.remove(inserted[i]))
+                return false;
+        }
+        for (int i = 10; i < 15; i++)
+        {
+            int newLoc = locGen.getRandNum();
+            if (!db.updateLocId(inserted[i], newLoc))
+                return false;
+            inserted[i].setLocID(newLoc);
+        }
+        db.changeProbPolicy(LINEAR);
+        for (int i = 30; i < 35; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
+        for (int i = 35; i < threshold; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        for (int i = 10; i < inserted.size(); i++)
+        {
+            DNA found = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
+            if (found.getSequence() != inserted[i].getSequence() || found.getLocId() != inserted[i].getLocId())
+                return false;
+        }
+        for (int i = 0; i < 10; i++)
+        {
+            DNA found = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
+            if (!found.getSequence().empty())
+                return false;
+        }
+        return true;
+    }
+    bool testRehashEdgeCase()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        vector<DNA> inserted;
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
+        for (int i = 0; i < threshold; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        if (!db.m_oldTable)
+            return false;
+        while (db.m_oldTable)
+        {
+            db.transferNextQuarter();
+        }
+        for (auto &dna : inserted)
+        {
+            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
+        }
+        return true;
+    }
+    bool testSelfAssignment()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        vector<DNA> inserted;
+        for (int i = 0; i < 10; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        db = db;
+        for (auto &dna : inserted)
+        {
+            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
+        }
+        return true;
+    }
+    bool testSingleEntryOperations()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        DNA dna(sequencer(5, 1), locGen.getRandNum(), true);
+        if (!db.insert(dna))
+            return false;
+        DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
+        if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+            return false;
+        int newLoc = locGen.getRandNum();
+        if (!db.updateLocId(dna, newLoc))
+            return false;
+        found = db.getDNA(dna.getSequence(), newLoc);
+        if (found.getSequence() != dna.getSequence() || found.getLocId() != newLoc)
+            return false;
+        dna.setLocID(newLoc);
+        if (!db.remove(dna))
+            return false;
+        found = db.getDNA(dna.getSequence(), newLoc);
+        if (!found.getSequence().empty())
+            return false;
+        return true;
+    }
+    bool testProbingPolicyChangeDuringRehash()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        vector<DNA> inserted;
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
+        for (int i = 0; i < threshold; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        if (!db.m_oldTable)
+            return false;
+        db.changeProbPolicy(LINEAR);
+        while (db.m_oldTable)
+        {
+            DNA dummy(sequencer(5, threshold + inserted.size()), locGen.getRandNum(), true);
+            inserted.push_back(dummy);
+            if (!db.insert(dummy))
+                return false;
+        }
+        for (auto &dna : inserted)
+        {
+            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
+        }
+        return true;
+    }
+    bool testLongSequence()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        string longSeq = sequencer(100, 1);
+        DNA dna(longSeq, locGen.getRandNum(), true);
+        if (!db.insert(dna))
+            return false;
+        DNA found = db.getDNA(longSeq, dna.getLocId());
+        if (found.getSequence() != longSeq || found.getLocId() != dna.getLocId())
+            return false;
+        if (!db.remove(dna))
+            return false;
+        found = db.getDNA(longSeq, dna.getLocId());
+        if (!found.getSequence().empty())
+            return false;
+        return true;
+    }
+    bool testNonPrimeSize()
+    {
+        // Test non-prime size
+        DnaDb db(100, hashCode, DOUBLEHASH);
+        if (db.m_currentCap <= 100 || !db.isPrime(db.m_currentCap))
+            return false;
+        // Test size below MINPRIME
+        DnaDb db2(50, hashCode, DOUBLEHASH);
+        if (db2.m_currentCap != MINPRIME)
+            return false;
+        // Test size above MAXPRIME
+        DnaDb db3(100000, hashCode, DOUBLEHASH);
+        if (db3.m_currentCap != MAXPRIME)
+            return false;
+        // Test negative size
+        DnaDb db4(-10, hashCode, DOUBLEHASH);
+        if (db4.m_currentCap != MINPRIME)
+            return false;
+        return true;
+    }
+    bool testDuplicateInsertion()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        DNA dna(sequencer(5, 1), locGen.getRandNum(), true);
+        if (!db.insert(dna))
+            return false;
+        // Try inserting the same DNA again
+        if (db.insert(dna))
+            return false;
+        DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
+        if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+            return false;
+        return true;
+    }
+
+    bool testOperationsPartialRehash()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        vector<DNA> inserted;
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
+        for (int i = 0; i < threshold; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        if (!db.m_oldTable)
+            return false;
+        // Transfer one quarter
+        db.transferNextQuarter();
+        // Test insert
+        DNA newDna(sequencer(5, threshold), locGen.getRandNum(), true);
+        inserted.push_back(newDna);
+        if (!db.insert(newDna))
+            return false;
+        // Test remove
+        if (!db.remove(inserted[0]))
+            return false;
+        // Test getDNA
+        for (int i = 1; i < inserted.size(); i++)
+        {
+            DNA found = db.getDNA(inserted[i].getSequence(), inserted[i].getLocId());
+            if (found.getSequence() != inserted[i].getSequence() || found.getLocId() != inserted[i].getLocId())
+                return false;
+        }
+        DNA found = db.getDNA(inserted[0].getSequence(), inserted[0].getLocId());
+        if (!found.getSequence().empty())
+            return false;
+        return true;
+    }
+    bool testInvalidSequenceCharacters()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        DNA dna("XYZ12", locGen.getRandNum(), true);
+        if (!db.insert(dna))
+            return false; // DnaDb accepts any string, so this should pass
+        DNA found = db.getDNA("XYZ12", dna.getLocId());
+        if (found.getSequence() != "XYZ12" || found.getLocId() != dna.getLocId())
+            return false;
+        return true;
+    }
+
+    
+    bool testOldTableCleanup()
+    {
+        DnaDb db(MINPRIME, hashCode, DOUBLEHASH);
+        Random locGen(MINLOCID, MAXLOCID);
+        locGen.setSeed(42);
+        vector<DNA> inserted;
+        int threshold = static_cast<int>(MINPRIME * 0.5) + 1;
+        for (int i = 0; i < threshold; i++)
+        {
+            DNA dna(sequencer(5, i), locGen.getRandNum(), true);
+            inserted.push_back(dna);
+            if (!db.insert(dna))
+                return false;
+        }
+        if (!db.m_oldTable)
+            return false;
+        while (db.m_oldTable)
+        {
+            db.transferNextQuarter();
+        }
+        if (db.m_oldTable != nullptr || db.m_oldCap != 0 || db.m_oldSize != 0 || db.m_oldNumDeleted != 0)
+            return false;
+        for (auto &dna : inserted)
+        {
+            DNA found = db.getDNA(dna.getSequence(), dna.getLocId());
+            if (found.getSequence() != dna.getSequence() || found.getLocId() != dna.getLocId())
+                return false;
+        }
         return true;
     }
 };
-
 
 int main()
 {
@@ -605,7 +1030,17 @@ int main()
     cout << "testAllProbingPolicies: " << (tester.testAllProbingPolicies() ? "PASS" : "FAIL") << endl;
     cout << "testInsertAfterMultipleRemoves: " << (tester.testInsertAfterMultipleRemoves() ? "PASS" : "FAIL") << endl;
     cout << "testEmptyTableOperations: " << (tester.testEmptyTableOperations() ? "PASS" : "FAIL") << endl;
-
+    cout << "testComplexOperations: " << (tester.testComplexOperations() ? "PASS" : "FAIL") << endl;
+    cout << "testRehashEdgeCase: " << (tester.testRehashEdgeCase() ? "PASS" : "FAIL") << endl;
+    cout << "testSelfAssignment: " << (tester.testSelfAssignment() ? "PASS" : "FAIL") << endl;
+    cout << "testSingleEntryOperations: " << (tester.testSingleEntryOperations() ? "PASS" : "FAIL") << endl;
+    cout << "testProbingPolicyChangeDuringRehash: " << (tester.testProbingPolicyChangeDuringRehash() ? "PASS" : "FAIL") << endl;
+    cout << "testLongSequence: " << (tester.testLongSequence() ? "PASS" : "FAIL") << endl;
+    cout << "testNonPrimeSize: " << (tester.testNonPrimeSize() ? "PASS" : "FAIL") << endl;
+    cout << "testDuplicateInsertion: " << (tester.testDuplicateInsertion() ? "PASS" : "FAIL") << endl;
+    cout << "testOperationsPartialRehash: " << (tester.testOperationsPartialRehash() ? "PASS" : "FAIL") << endl;
+    cout << "testInvalidSequenceCharacters: " << (tester.testInvalidSequenceCharacters() ? "PASS" : "FAIL") << endl;
+    cout << "testOldTableCleanup: " << (tester.testOldTableCleanup() ? "PASS" : "FAIL") << endl;
     return 0;
 }
 
